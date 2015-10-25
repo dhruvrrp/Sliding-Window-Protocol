@@ -100,9 +100,13 @@ typedef struct Receiver_t Receiver;
 
 //TODO: You should change this!
 //Remember, your frame can be AT MOST 64 bytes!
-#define FRAME_PAYLOAD_SIZE 64
+#define FRAME_PAYLOAD_SIZE 48
 struct Frame_t
 {
+    char senderID;
+    char recieverID;
+    char sequence;
+    unsigned int ACK:1;
     char data[FRAME_PAYLOAD_SIZE];
 };
 typedef struct Frame_t Frame;
