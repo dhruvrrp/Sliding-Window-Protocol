@@ -103,8 +103,8 @@ typedef struct Receiver_t Receiver;
 #define FRAME_PAYLOAD_SIZE 48
 struct Frame_t
 {
-    char senderID;
-    char recieverID;
+    uint16_t senderID;
+    uint16_t recieverID;
     char sequence;
     unsigned int ACK:1;
     char data[FRAME_PAYLOAD_SIZE];
