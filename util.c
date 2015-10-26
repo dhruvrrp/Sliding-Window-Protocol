@@ -126,7 +126,35 @@ char * convert_frame_to_char(Frame * frame)
     memset(char_buffer,
            0,
            MAX_FRAME_SIZE);
-    memcpy(char_buffer, 
+
+//   snprintf(char_buffer, "%d", 
+//             frame->senderID, sizeof(frame->senderID));
+ /*   char * temp = (char *) malloc(MAX_FRAME_SIZE-FRAME_PAYLOAD_SIZE);
+    memset(temp, 0, MAX_FRAME_SIZE-FRAME_PAYLOAD_SIZE);
+    sprintf(temp, "%d", frame->senderID);
+    strcat(char_buffer, temp);
+    memset(temp, 0, MAX_FRAME_SIZE-FRAME_PAYLOAD_SIZE);
+    sprintf(temp, "%d", frame->receiverID);
+    strcat(char_buffer, temp);
+    char * SeqACK = (char *) malloc(2*sizeof(char));
+    SeqACK[0] = frame->sequence;
+    SeqACK[1] = frame->ACK;
+    strcat(char_buffer, SeqACK);
+    strcat(char_buffer, frame->data);
+*/
+    memcpy(char_buffer,
+           &frame->senderID,
+           sizeof(frame->senderID));
+    memmove(char_buffer+sizeof(uint16_t),
+           &frame->receiverID,
+           sizeof(frame->receiverID));
+    memmove(char_buffer+2*sizeof(uint16_t),
+           &frame->sequence,
+           sizeof(char));
+    memmove(char_buffer+2*sizeof(uint16_t)+sizeof(char),
+           &frame->ACK,
+           sizeof(char));
+    memmove(char_buffer+2*(sizeof(uint16_t)+sizeof(char)), 
            frame->data,
            FRAME_PAYLOAD_SIZE);
     return char_buffer;
@@ -135,13 +163,25 @@ char * convert_frame_to_char(Frame * frame)
 
 Frame * convert_char_to_frame(char * char_buf)
 {
-    //TODO: You should implement this as necessary
     Frame * frame = (Frame *) malloc(sizeof(Frame));
+    fprintf(stderr, char_buf);
     memset(frame->data,
            0,
-           sizeof(char)*sizeof(frame->data));
-    memcpy(frame->data, 
+           FRAME_PAYLOAD_SIZE);
+    memcpy(&frame->senderID, 
            char_buf,
-           sizeof(char)*sizeof(frame->data));
+           2);
+    memcpy(&frame->receiverID,
+           char_buf+2,
+           2);
+    frame->sequence = char_buf[4];
+    frame->ACK = char_buf[5];
+
+
+
+
+    memcpy(frame->data,
+           char_buf+6,
+           FRAME_PAYLOAD_SIZE);
     return frame;
 }

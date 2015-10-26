@@ -17,6 +17,8 @@
 #define AUTOMATED_FILENAME 512
 typedef unsigned char uchar_t;
 
+//Largest id (in bytes) of threads (sender and receiver)
+#define MAX_THREAD_ID 2
 //System configuration information
 struct SysConfig_t
 {
@@ -104,9 +106,9 @@ typedef struct Receiver_t Receiver;
 struct Frame_t
 {
     uint16_t senderID;
-    uint16_t recieverID;
+    uint16_t receiverID;
     char sequence;
-    unsigned int ACK:1;
+    char ACK;
     char data[FRAME_PAYLOAD_SIZE];
 };
 typedef struct Frame_t Frame;

@@ -70,13 +70,17 @@ void handle_input_cmds(Sender * sender,
             //This is probably ONLY one step you want
             Frame * outgoing_frame = (Frame *) malloc (sizeof(Frame));
             strcpy(outgoing_frame->data, outgoing_cmd->message);
-
+ 
+            outgoing_frame->senderID = outgoing_cmd->src_id;
+            outgoing_frame->receiverID = outgoing_cmd->dst_id;
+            outgoing_frame->ACK = 0x0;
             //At this point, we don't need the outgoing_cmd
             free(outgoing_cmd->message);
             free(outgoing_cmd);
 
             //Convert the message to the outgoing_charbuf
             char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
+            fprintf(stderr, outgoing_charbuf);
             ll_append_node(outgoing_frames_head_ptr,
                            outgoing_charbuf);
             free(outgoing_frame);

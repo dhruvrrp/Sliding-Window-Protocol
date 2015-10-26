@@ -37,7 +37,7 @@ void handle_incoming_msgs(Receiver * receiver,
         
         //Free raw_char_buf
         free(raw_char_buf);
-        
+        if(inframe->receiverID == receiver->recv_id) 
         printf("<RECV_%d>:[%s]\n", receiver->recv_id, inframe->data);
 
         free(inframe);
