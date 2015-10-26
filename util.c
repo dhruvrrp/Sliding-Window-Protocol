@@ -121,7 +121,6 @@ void print_cmd(Cmd * cmd)
 
 char * convert_frame_to_char(Frame * frame)
 {
-    //TODO: You should implement this as necessary
     char * char_buffer = (char *) malloc(MAX_FRAME_SIZE);
     memset(char_buffer,
            0,

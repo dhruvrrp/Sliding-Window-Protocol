@@ -37,9 +37,21 @@ void handle_incoming_msgs(Receiver * receiver,
         
         //Free raw_char_buf
         free(raw_char_buf);
+        //Check if data belongs to this receiver and send ACK
         if(inframe->receiverID == receiver->recv_id) 
-        printf("<RECV_%d>:[%s]\n", receiver->recv_id, inframe->data);
-
+        {
+            printf("<RECV_%d>:[%s]\n", receiver->recv_id, 
+                   inframe->data);
+            inframe->ACK = 1;
+            inframe->data = NULL;
+            uint16_t temp = inframe->senderID;
+            inframe->senderID = inframe->receiverID;
+            inframe->receiverID = temp;
+            raw_char_buf = (char *) convert_frame_to_char(inframe);
+            ll_append_node(outgoing_frames_head_ptr,
+                           raw_char_buf);
+        }
+        free(raw_char_buf);
         free(inframe);
         free(ll_inmsg_node);
     }

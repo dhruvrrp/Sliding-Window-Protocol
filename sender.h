@@ -16,7 +16,6 @@
 #include "util.h"
 #include "communicate.h"
 
-
 void init_sender(Sender *, int);
 void * run_sender(void *);
 
