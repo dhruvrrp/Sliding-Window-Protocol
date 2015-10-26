@@ -8,6 +8,8 @@ void init_sender(Sender * sender, int id)
     sender->input_framelist_head = NULL;
     pthread_cond_init(&sender->buffer_cv, NULL);
     pthread_mutex_init(&sender->buffer_mutex, NULL);
+
+    sender->SWP_list_head = NULL;
 }
 
 struct timeval * sender_get_next_expiring_timeval(Sender * sender)
@@ -40,7 +42,7 @@ void handle_input_cmds(Sender * sender,
 
     int input_cmd_length = ll_get_length(sender->input_cmdlist_head);
     
-        
+    int i = 0;    
     //Recheck the command queue length to see if stdin_thread dumped a command on us
     input_cmd_length = ll_get_length(sender->input_cmdlist_head);
     while (input_cmd_length > 0)
@@ -52,39 +54,114 @@ void handle_input_cmds(Sender * sender,
         //Cast to Cmd type and free up the memory for the node
         Cmd * outgoing_cmd = (Cmd *) ll_input_cmd_node->value;
         free(ll_input_cmd_node);
-            
-
+        Sender_SWP *cur_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
+        int SWP_list_length = ll_get_length(sender->SWP_list_head);
+        if(SWP_list_length == 0)
+        {
+            Sender_SWP * s_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
+            s_SWP->LAR = -1;
+            s_SWP->LFS = -1;
+            s_SWP->msg_buffer = NULL;
+            s_SWP->receiver = outgoing_cmd->dst_id;
+            ll_append_node(&sender->SWP_list_head, s_SWP);
+            memcpy(cur_SWP, s_SWP, sizeof(Sender_SWP));
+            free(s_SWP);
+        }
+        else
+        {
+            for(i = 0; i < SWP_list_length; i++)
+            {
+                LLnode * oldhead = ll_pop_node(&sender->SWP_list_head);
+                Sender_SWP * check = (Sender_SWP *) oldhead->value;
+                if(check->receiver == outgoing_cmd->dst_id)
+                {
+                    memcpy(cur_SWP, check, sizeof(Sender_SWP));
+                    i = SWP_list_length + 2;
+                }
+                ll_append_node(&sender->SWP_list_head, check);
+            }
+            if(i != (SWP_list_length + 2))
+            {
+                Sender_SWP * s_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
+                s_SWP->LAR = -1;
+                s_SWP->LFS = -1;
+                s_SWP->msg_buffer = NULL;
+                s_SWP->receiver = outgoing_cmd->dst_id;
+                ll_append_node(&sender->SWP_list_head, s_SWP);
+                memcpy(cur_SWP, s_SWP, sizeof(Sender_SWP));
+                free(s_SWP);
+            }
+        }
         //DUMMY CODE: Add the raw char buf to the outgoing_frames list
         //NOTE: You should not blindly send this message out!
         //      Ask yourself: Is this message actually going to the right receiver (recall that default behavior of send is to broadcast to all receivers)?
         //                    Does the receiver have enough space in in it's input queue to handle this message?
         //                    Were the previous messages sent to this receiver ACTUALLY delivered to the receiver?
         int msg_length = strlen(outgoing_cmd->message);
-        if (msg_length > MAX_FRAME_SIZE)
+        if (msg_length > FRAME_PAYLOAD_SIZE)
         {
-            //Do something about messages that exceed the frame size
-            printf("<SEND_%d>: sending messages of length greater than %d is not implemented\n", sender->send_id, MAX_FRAME_SIZE);
+            uint16_t num_frames = msg_length / FRAME_PAYLOAD_SIZE;
+            num_frames += msg_length % FRAME_PAYLOAD_SIZE;
+            for(i = 0; i < num_frames; i++)
+            {
+                if((cur_SWP->LFS - cur_SWP->LAR) < 8)
+                {
+                    cur_SWP->LFS++;
+                    Frame * outgoing_frame = (Frame *) malloc (sizeof(Frame));
+                    char * temp = (char *) malloc(FRAME_PAYLOAD_SIZE);
+                    strncpy(temp, outgoing_cmd->message+(i * FRAME_PAYLOAD_SIZE), FRAME_PAYLOAD_SIZE);
+                    strcpy(outgoing_frame->data, temp);
+                    outgoing_frame->senderID = outgoing_cmd->src_id;
+                    outgoing_frame->receiverID = outgoing_cmd->dst_id;
+                    outgoing_frame->ACK = 0x0;
+                    outgoing_frame->sequence = cur_SWP->LFS;
+                    char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
+                    ll_append_node(outgoing_frames_head_ptr, outgoing_charbuf);
+                    free(outgoing_frame);
+                    free(temp);
+                }
+                else
+                {
+                    if(cur_SWP->msg_buffer == NULL)
+                        strcpy(cur_SWP->msg_buffer, outgoing_cmd->message);
+                    else
+                        strcat(cur_SWP->msg_buffer, outgoing_cmd->message);
+                }
+            }
         }
         else
         {
+            if((cur_SWP->LFS - cur_SWP->LAR) < 8)
+            {
+                cur_SWP->LFS++;
             //This is probably ONLY one step you want
-            Frame * outgoing_frame = (Frame *) malloc (sizeof(Frame));
-            strcpy(outgoing_frame->data, outgoing_cmd->message);
- 
-            outgoing_frame->senderID = outgoing_cmd->src_id;
-            outgoing_frame->receiverID = outgoing_cmd->dst_id;
-            outgoing_frame->ACK = 0x0;
+                Frame * outgoing_frame = (Frame *) malloc (sizeof(Frame));
+                strcpy(outgoing_frame->data, outgoing_cmd->message);
+                outgoing_frame->senderID = outgoing_cmd->src_id;
+                outgoing_frame->receiverID = outgoing_cmd->dst_id;
+                outgoing_frame->ACK = 0x0;
+                outgoing_frame->sequence = cur_SWP->LFS;
             //At this point, we don't need the outgoing_cmd
-            free(outgoing_cmd->message);
-            free(outgoing_cmd);
+  //              free(outgoing_cmd->message);
+ //               free(outgoing_cmd);
 
             //Convert the message to the outgoing_charbuf
-            char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
-            fprintf(stderr, outgoing_charbuf);
-            ll_append_node(outgoing_frames_head_ptr,
+                char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
+
+                ll_append_node(outgoing_frames_head_ptr,
                            outgoing_charbuf);
-            free(outgoing_frame);
+                free(outgoing_frame);
+            }
+            else
+            {
+                if(cur_SWP->msg_buffer == NULL)
+                    strcpy(cur_SWP->msg_buffer, outgoing_cmd->message);
+                else
+                    strcat(cur_SWP->msg_buffer, outgoing_cmd->message);
+            }
         }
+        free(outgoing_cmd->message);
+        free(outgoing_cmd);
     }   
 }
 

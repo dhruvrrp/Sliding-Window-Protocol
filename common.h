@@ -72,7 +72,7 @@ struct Receiver_t
     
     int recv_id;
 
-    LLnode * SWP_list;
+    LLnode * SWP_list_head;
 };
 
 struct Sender_t
@@ -88,25 +88,26 @@ struct Sender_t
     LLnode * input_cmdlist_head;
     LLnode * input_framelist_head;
     int send_id;
-    LLnode * SWP_list;
+    LLnode * SWP_list_head;
 };
 
 //Sliding Window Protocol structs for sender and receivers
 
-struct Sender_SWP
+struct Sender_sw
 {
     uint16_t LAR;
     uint16_t LFS;
     uint16_t receiver;
+    char * msg_buffer;
 };
-
-struct Receiver_SWP
+typedef struct Sender_sw Sender_SWP;
+struct Receiver_sw
 {
     uint16_t LFR;
     uint16_t LAF;
     uint16_t sender;
 };
-
+typedef struct Receiver_sw Receiver_SWP;
 enum SendFrame_DstType 
 {
     ReceiverDst,

@@ -43,7 +43,7 @@ void handle_incoming_msgs(Receiver * receiver,
             printf("<RECV_%d>:[%s]\n", receiver->recv_id, 
                    inframe->data);
             inframe->ACK = 1;
-            inframe->data = NULL;
+            free(inframe->data);
             uint16_t temp = inframe->senderID;
             inframe->senderID = inframe->receiverID;
             inframe->receiverID = temp;
