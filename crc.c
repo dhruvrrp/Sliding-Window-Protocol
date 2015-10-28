@@ -1,13 +1,14 @@
 #include "crc.h"
 char get_bit(char byte, int pos)
 {
-    byte = byte >> (7-pos);
-    char result = byte & 1;
+    byte = byte >> (pos);
+    char result = byte & 0x01;
     return result;
 }
 char crc8(char* array, int array_len)
 {
     char poly = 0x07;
+    char va = 0x80;
     char crc = array[0];
     int i, j;
     for(i = 1; i < array_len; i++)
@@ -16,8 +17,8 @@ char crc8(char* array, int array_len)
         for(j = 7; j >=0; j--)
         {
             char aw = crc;
-            aw >> 7;
-            if(aw == 0)
+            aw = aw >> 7;
+            if((va & crc)  == 0)
             {
                 crc = crc << 1;
                 crc = crc | get_bit(next_byte, j);

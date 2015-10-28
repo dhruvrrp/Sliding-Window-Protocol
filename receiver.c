@@ -26,6 +26,10 @@ int count = 0;
         cur_SWP->LFR = -1;
         cur_SWP->LAF = 7;
         cur_SWP->str = 0;
+        int k =0;
+        for(k = 0; i< 8; i++)
+        cur_SWP->ACK[k] = 0;
+        cur_SWP->ACK_c = 0;
         cur_SWP->sender = sendID;
 
         ll_append_node(&receiver->SWP_list_head, cur_SWP);
@@ -43,7 +47,7 @@ int count = 0;
             {
                 count = 1;
                 FOUND_SWP = check;
-                fprintf(stderr, "Found_SWP %p \n", check);
+             //   fprintf(stderr, "Found_SWP %p \n", check);
            //     memcpy(cur_SWP, check, sizeof(Sender_SWP));
                 i = SWP_list_length + 2;
             }
@@ -56,6 +60,10 @@ int count = 0;
             cur_SWP->Frame_buffer_head = NULL;
             cur_SWP->LFR = -1;
             cur_SWP->LAF = 7;
+            int k =0;
+            for(k = 0; i< 8; i++)
+                cur_SWP->ACK[k] = 0;
+            cur_SWP->ACK_c = 0;
             cur_SWP->str = 0;
             cur_SWP->sender = sendID;
             ll_append_node(&receiver->SWP_list_head, cur_SWP);
@@ -93,19 +101,41 @@ void handle_incoming_msgs(Receiver * receiver,
         //                    Is this an old, retransmitted message?           
         char * raw_char_buf = (char *) ll_inmsg_node->value;
         if(is_corrupted(raw_char_buf, strlen(raw_char_buf)))
+        {
+            fprintf(stderr, "xxxCORRUPT-PACKETxxx\n");
             cor = 1; 
+        }
         Frame * inframe = convert_char_to_frame(raw_char_buf);
         Receiver_SWP * cur_SWP;
-        cur_SWP = get_SWP_instanceR(receiver, inframe->senderID);
+   //     cur_SWP = get_SWP_instanceR(receiver, inframe->senderID);
         //Free raw_char_buf
         free(raw_char_buf);
         //Check if data belongs to this receiver and send ACK
         if(inframe->receiverID == receiver->recv_id && cor == 0) 
         {
+fprintf(stderr, "NO CORRUPTION\n");
+            cur_SWP = get_SWP_instanceR(receiver, inframe->senderID);
  //ADD CASE FOR DUPLICATES
             if((inframe->sequence >= cur_SWP->LFR && inframe->sequence < cur_SWP->LAF)||cur_SWP->str == 0)
             {
                 ll_append_node(&cur_SWP->Frame_buffer_head, inframe);
+            }
+            int i = 0;
+            for(i = 0; i < 8; i++)
+            {
+                if(inframe->sequence == cur_SWP->ACK[i])
+                {
+                    Frame * rep_c = (Frame *) malloc(sizeof(Frame));
+                    uint16_t rtemp = inframe->senderID;
+                    rep_c->senderID = inframe->receiverID;
+                    rep_c->receiverID = rtemp;
+                    rep_c->ACK = 1;
+                    rep_c->sequence = inframe->sequence;
+                    char * r_char_buf = (char *) convert_frame_to_char(rep_c);
+                    append_crc(r_char_buf, strlen(r_char_buf));
+                    ll_append_node(outgoing_frames_head_ptr,
+                                   r_char_buf);
+                }
             }
             int Frame_buffer_length = ll_get_length(cur_SWP->Frame_buffer_head);
             int count = Frame_buffer_length;
@@ -126,14 +156,16 @@ void handle_incoming_msgs(Receiver * receiver,
                         
                     curr->ACK = 1;
                     uint16_t temp = inframe->senderID;
-                    curr->senderID = curr->receiverID;
-
+                    curr->senderID = inframe->receiverID;
+                    curr->sequence = inframe->sequence;
                     curr->receiverID = temp;
                     raw_char_buf = (char *) convert_frame_to_char(curr);
+                    append_crc(raw_char_buf, strlen(raw_char_buf));
                     ll_append_node(outgoing_frames_head_ptr,
                           raw_char_buf);
                     cur_SWP->LFR = cur_SWP->LFR+1;
                     cur_SWP->LAF = cur_SWP->LAF+1;
+                    cur_SWP->ACK[cur_SWP->ACK_c%8] = cur_SWP->LFR;
                     count = Frame_buffer_length-1;
                     if(cur_SWP->str == 0){//cur_SWP->LFR = 0;
                         cur_SWP->str =1;}

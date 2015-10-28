@@ -112,6 +112,8 @@ struct Receiver_sw
     uint16_t sender;
 int str;
     LLnode * Frame_buffer_head;
+    unsigned char ACK[8];
+    uint8_t ACK_c;
 };
 typedef struct Receiver_sw Receiver_SWP;
 enum SendFrame_DstType 
