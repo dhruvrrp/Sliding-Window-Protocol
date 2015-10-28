@@ -7,6 +7,65 @@ void init_receiver(Receiver * receiver,
     receiver->input_framelist_head = NULL;
     pthread_cond_init(&receiver->buffer_cv, NULL);
     pthread_mutex_init(&receiver->buffer_mutex, NULL);
+    receiver->SWP_list_head = NULL;
+}
+
+
+
+Receiver_SWP * get_SWP_instanceR(Receiver * receiver, uint16_t sendID)
+{
+int count = 0;
+    int i = 0;
+    Receiver_SWP *FOUND_SWP;
+    Receiver_SWP *cur_SWP;
+    int SWP_list_length = ll_get_length(receiver->SWP_list_head);
+    if(SWP_list_length == 0)
+    {
+        cur_SWP = (Receiver_SWP *) malloc(sizeof(Receiver_SWP));
+        cur_SWP->Frame_buffer_head = NULL;
+        cur_SWP->LFR = -1;
+        cur_SWP->LAF = 7;
+        cur_SWP->str = 0;
+        cur_SWP->sender = sendID;
+
+        ll_append_node(&receiver->SWP_list_head, cur_SWP);
+      //  memcpy(cur_SWP, r_SWP, sizeof(Receiver_SWP));
+      //  free(r_SWP);
+    }
+    else
+    {
+        count = 0;
+        for(i = 0; i < SWP_list_length; i++)
+        {
+            LLnode * oldhead = ll_pop_node(&receiver->SWP_list_head);
+            Receiver_SWP * check = (Receiver_SWP *) oldhead->value;
+            if(check->sender == sendID)
+            {
+                count = 1;
+                FOUND_SWP = check;
+                fprintf(stderr, "Found_SWP %p \n", check);
+           //     memcpy(cur_SWP, check, sizeof(Sender_SWP));
+                i = SWP_list_length + 2;
+            }
+            ll_append_node(&receiver->SWP_list_head, check);
+  //          free(check);
+        }
+        if(count == 0)
+        {
+            cur_SWP = (Receiver_SWP *) malloc(sizeof(Receiver_SWP));
+            cur_SWP->Frame_buffer_head = NULL;
+            cur_SWP->LFR = -1;
+            cur_SWP->LAF = 7;
+            cur_SWP->str = 0;
+            cur_SWP->sender = sendID;
+            ll_append_node(&receiver->SWP_list_head, cur_SWP);
+    //        memcpy(cur_SWP, r_SWP, sizeof(Sender_SWP));
+      //      free(r_SWP);
+        }
+    }
+if(count == 1)
+return FOUND_SWP;
+    return cur_SWP;
 }
 
 
@@ -34,24 +93,56 @@ void handle_incoming_msgs(Receiver * receiver,
         //                    Is this an old, retransmitted message?           
         char * raw_char_buf = (char *) ll_inmsg_node->value;
         Frame * inframe = convert_char_to_frame(raw_char_buf);
-        
+        Receiver_SWP * cur_SWP;
+        cur_SWP = get_SWP_instanceR(receiver, inframe->senderID);
         //Free raw_char_buf
         free(raw_char_buf);
         //Check if data belongs to this receiver and send ACK
         if(inframe->receiverID == receiver->recv_id) 
         {
-            printf("<RECV_%d>:[%s]\n", receiver->recv_id, 
-                   inframe->data);
-            inframe->ACK = 1;
-            free(inframe->data);
-            uint16_t temp = inframe->senderID;
-            inframe->senderID = inframe->receiverID;
-            inframe->receiverID = temp;
-            raw_char_buf = (char *) convert_frame_to_char(inframe);
-            ll_append_node(outgoing_frames_head_ptr,
-                           raw_char_buf);
+ //ADD CASE FOR DUPLICATES
+            if((inframe->sequence >= cur_SWP->LFR && inframe->sequence < cur_SWP->LAF)||cur_SWP->str == 0)
+            {
+                ll_append_node(&cur_SWP->Frame_buffer_head, inframe);
+            }
+            int Frame_buffer_length = ll_get_length(cur_SWP->Frame_buffer_head);
+            int count = Frame_buffer_length;
+            while(count > 0)
+            {
+                LLnode * cur = ll_pop_node(&cur_SWP->Frame_buffer_head);
+                count --;
+                Frame * curr = (Frame *) malloc(sizeof(Frame));
+                memcpy(curr, cur->value, sizeof(Frame));
+               // curr = (Frame *) cur->value;
+                unsigned char aa = curr->sequence;
+                unsigned char cLFR = cur_SWP->LFR +1;
+                if(aa == (cLFR))
+                {
+                    printf("<RECV_%d>:[%s]\n", receiver->recv_id, 
+                           inframe->data);
+
+                        
+                    curr->ACK = 1;
+                    uint16_t temp = inframe->senderID;
+                    curr->senderID = curr->receiverID;
+
+                    curr->receiverID = temp;
+                    raw_char_buf = (char *) convert_frame_to_char(curr);
+                    ll_append_node(outgoing_frames_head_ptr,
+                          raw_char_buf);
+                    cur_SWP->LFR = cur_SWP->LFR+1;
+                    cur_SWP->LAF = cur_SWP->LAF+1;
+                    count = Frame_buffer_length-1;
+                    if(cur_SWP->str == 0){//cur_SWP->LFR = 0;
+                        cur_SWP->str =1;}
+                }
+                else
+                {
+                    ll_append_node(&cur_SWP->Frame_buffer_head, curr); 
+                }
+                free(curr);
+            }
         }
-        free(raw_char_buf);
         free(inframe);
         free(ll_inmsg_node);
     }

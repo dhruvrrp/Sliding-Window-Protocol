@@ -12,6 +12,9 @@ void init_sender(Sender * sender, int id)
     sender->SWP_list_head = NULL;
 }
 
+
+
+
 struct timeval * sender_get_next_expiring_timeval(Sender * sender)
 {
     //TODO: You should fill in this function so that it returns the next timeout that should occur
@@ -19,18 +22,173 @@ struct timeval * sender_get_next_expiring_timeval(Sender * sender)
 }
 
 
+Sender_SWP * get_SWP_instance(Sender * sender, uint16_t recvID)
+{
+int count = 0;
+    int i = 0;
+Sender_SWP * foundSWP;
+    Sender_SWP *cur_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
+    int SWP_list_length = ll_get_length(sender->SWP_list_head);
+//fprintf(stderr, "SWP length %d\n",SWP_list_length);
+    if(SWP_list_length == 0)
+    {
+//        Sender_SWP * s_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
+        cur_SWP->Frame_buffer_head = NULL;
+        cur_SWP->LAR = -1;
+        cur_SWP->LFS = -1;
+        cur_SWP->exp_time = NULL;
+        cur_SWP->msg_buffer = "";
+        cur_SWP->receiver = recvID;
+        cur_SWP->ACK_rec = NULL;
+        ll_append_node(&sender->SWP_list_head, cur_SWP);
+    //    memcpy(cur_SWP, s_SWP, sizeof(Sender_SWP));
+
+    }
+    else
+    {
+        for(i = 0; i < SWP_list_length; i++)
+        {
+            LLnode * oldhead = ll_pop_node(&sender->SWP_list_head);
+            Sender_SWP * check = (Sender_SWP *) oldhead->value;
+
+            if(check->receiver == recvID)
+            {
+                count = 1;
+                foundSWP = check;
+//fprintf(stderr, "FOUND SWP %p\n",foundSWP);
+                i = SWP_list_length + 2;
+            }
+            ll_append_node(&sender->SWP_list_head, check);
+
+        }
+        if(count == 0)
+        {
+   //         Sender_SWP * s_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
+            cur_SWP->LAR = -1;
+            cur_SWP->LFS = -1;
+            cur_SWP->msg_buffer = "";
+            cur_SWP->receiver = recvID;
+            cur_SWP->exp_time = NULL;
+            cur_SWP->ACK_rec = NULL;
+            cur_SWP->Frame_buffer_head = NULL;
+            ll_append_node(&sender->SWP_list_head, cur_SWP);
+  //          memcpy(cur_SWP, s_SWP, sizeof(Sender_SWP));
+  //          free(s_SWP);
+        }
+    }
+if(count == 1)
+return foundSWP;
+SWP_list_length = ll_get_length(sender->SWP_list_head);
+//fprintf(stderr, "SWP length %d\n",SWP_list_length);
+//fprintf(stderr, "Frame_buffer_head ack %p\n",cur_SWP);
+    return cur_SWP;
+}
+
+void calculate_timeout(struct timeval * timeout)
+{
+    gettimeofday(timeout, NULL);
+    timeout->tv_usec+=100000;
+    if(timeout->tv_usec>=1000000)
+    {
+        timeout->tv_usec-=1000000;
+        timeout->tv_sec+=1;
+    }
+}
 void handle_incoming_acks(Sender * sender,
                           LLnode ** outgoing_frames_head_ptr)
 {
+    int incoming_msgs_length = ll_get_length(sender->input_framelist_head);
+    while (incoming_msgs_length > 0)
+    {
+        LLnode * ll_inmsg_node = ll_pop_node(&sender->input_framelist_head);
+        incoming_msgs_length = ll_get_length(sender->input_framelist_head);
+        char * raw_char_buf = (char *) ll_inmsg_node->value;
+        Frame * inframe = convert_char_to_frame(raw_char_buf);
+        Sender_SWP * cur_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
+       
+//        cur_SWP = get_SWP_instance(sender, inframe->senderID);
+        if(inframe->receiverID == sender->send_id)
+        {
+            if(inframe->ACK == 1)
+            {
+cur_SWP = get_SWP_instance(sender, inframe->senderID);
+                LLnode * curr_fra;
+        //        LLnode * curr_ACK;
+                Frame * curr_frame;
+                int frame_buffer_length = ll_get_length(cur_SWP->Frame_buffer_head);
+                int count = frame_buffer_length;
+                while(count > 0)
+                {
+                    curr_fra = ll_get(count, &cur_SWP->Frame_buffer_head);
+                    curr_frame = (Frame *) curr_fra->value;
+                    LLnode * curr_ACK = ll_pop_node(&cur_SWP->ACK_rec);
+                    if(curr_frame->sequence == inframe->sequence)
+                    {
+                        ll_append_node(&cur_SWP->ACK_rec, (void*)1);
+                    }
+                    else
+                    {
+                        ll_append_node(&cur_SWP->ACK_rec, curr_ACK->value);
+                    }
+                    count--;
+                }
+                count = 1;
+                LLnode * curr_ACK;
+                while(count <= frame_buffer_length)
+                {
+                    curr_ACK = ll_get(count, &cur_SWP->ACK_rec);
+                    if((int)curr_ACK->value == 1)
+                    {
+                        ll_pop_node(&cur_SWP->ACK_rec);
+                        ll_pop_node(&cur_SWP->Frame_buffer_head);
+//fprintf(stderr, "cur_SWP ack %p\n",cur_SWP);
+  //                      fprintf(stderr, "Frame_buffer_head ack %p\n",&cur_SWP->Frame_buffer_head);
+                        ll_pop_node(&cur_SWP->exp_time);
+//fprintf(stderr, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
+
+   cur_SWP->LAR = (cur_SWP->LAR+1)%255;
+                    }
+                    count++;
+                }
+                int char_buffer_size = strlen(cur_SWP->msg_buffer);
+                cur_SWP->LAR = inframe->sequence;
+                count = 0;
+                while((cur_SWP->LFS - cur_SWP->LAR < 8)%255 &&
+                      char_buffer_size > 0)
+                {
+                    cur_SWP->LFS = (cur_SWP->LFS++)%255;
+                    Frame * outgoing_frame = (Frame *) malloc (sizeof(Frame));
+                    char * temp = (char *) malloc(FRAME_PAYLOAD_SIZE);
+                    strncpy(temp, cur_SWP->msg_buffer+(count * FRAME_PAYLOAD_SIZE), FRAME_PAYLOAD_SIZE);
+                    strcpy(outgoing_frame->data, temp);
+                    outgoing_frame->senderID = sender->send_id;
+                    outgoing_frame->receiverID = inframe->senderID;
+                    outgoing_frame->ACK = 0x0;
+                    outgoing_frame->sequence = cur_SWP->LFS;
+                    struct timeval * timeout = (struct timeval *) malloc(sizeof(struct timeval));
+                    calculate_timeout(timeout);
+                    ll_append_node(&cur_SWP->exp_time, timeout);
+                    char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
+                    ll_append_node(outgoing_frames_head_ptr, outgoing_charbuf);
+                    free(outgoing_frame);
+                    free(temp);                             
+                    count++;
+                }
+            } 
+        }
+    }          
+             
+
+
+   
     //TODO: Suggested steps for handling incoming ACKs
     //    1) Dequeue the ACK from the sender->input_framelist_head
     //    2) Convert the char * buffer to a Frame data type
     //    3) Check whether the frame is corrupted
     //    4) Check whether the frame is for this sender
     //    5) Do sliding window protocol for sender/receiver pair   
+
 }
-
-
 void handle_input_cmds(Sender * sender,
                        LLnode ** outgoing_frames_head_ptr)
 {
@@ -55,43 +213,8 @@ void handle_input_cmds(Sender * sender,
         Cmd * outgoing_cmd = (Cmd *) ll_input_cmd_node->value;
         free(ll_input_cmd_node);
         Sender_SWP *cur_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
-        int SWP_list_length = ll_get_length(sender->SWP_list_head);
-        if(SWP_list_length == 0)
-        {
-            Sender_SWP * s_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
-            s_SWP->LAR = -1;
-            s_SWP->LFS = -1;
-            s_SWP->msg_buffer = NULL;
-            s_SWP->receiver = outgoing_cmd->dst_id;
-            ll_append_node(&sender->SWP_list_head, s_SWP);
-            memcpy(cur_SWP, s_SWP, sizeof(Sender_SWP));
-            free(s_SWP);
-        }
-        else
-        {
-            for(i = 0; i < SWP_list_length; i++)
-            {
-                LLnode * oldhead = ll_pop_node(&sender->SWP_list_head);
-                Sender_SWP * check = (Sender_SWP *) oldhead->value;
-                if(check->receiver == outgoing_cmd->dst_id)
-                {
-                    memcpy(cur_SWP, check, sizeof(Sender_SWP));
-                    i = SWP_list_length + 2;
-                }
-                ll_append_node(&sender->SWP_list_head, check);
-            }
-            if(i != (SWP_list_length + 2))
-            {
-                Sender_SWP * s_SWP = (Sender_SWP *) malloc(sizeof(Sender_SWP));
-                s_SWP->LAR = -1;
-                s_SWP->LFS = -1;
-                s_SWP->msg_buffer = NULL;
-                s_SWP->receiver = outgoing_cmd->dst_id;
-                ll_append_node(&sender->SWP_list_head, s_SWP);
-                memcpy(cur_SWP, s_SWP, sizeof(Sender_SWP));
-                free(s_SWP);
-            }
-        }
+        
+        cur_SWP = get_SWP_instance(sender, outgoing_cmd->dst_id); 
         //DUMMY CODE: Add the raw char buf to the outgoing_frames list
         //NOTE: You should not blindly send this message out!
         //      Ask yourself: Is this message actually going to the right receiver (recall that default behavior of send is to broadcast to all receivers)?
@@ -106,7 +229,7 @@ void handle_input_cmds(Sender * sender,
             {
                 if((cur_SWP->LFS - cur_SWP->LAR) < 8)
                 {
-                    cur_SWP->LFS++;
+                    cur_SWP->LFS = (cur_SWP->LFS++)%255;
                     Frame * outgoing_frame = (Frame *) malloc (sizeof(Frame));
                     char * temp = (char *) malloc(FRAME_PAYLOAD_SIZE);
                     strncpy(temp, outgoing_cmd->message+(i * FRAME_PAYLOAD_SIZE), FRAME_PAYLOAD_SIZE);
@@ -115,6 +238,12 @@ void handle_input_cmds(Sender * sender,
                     outgoing_frame->receiverID = outgoing_cmd->dst_id;
                     outgoing_frame->ACK = 0x0;
                     outgoing_frame->sequence = cur_SWP->LFS;
+                    ll_append_node(&cur_SWP->Frame_buffer_head, outgoing_frame);
+                    struct timeval * timeout = (struct timeval *) 
+                                               malloc(sizeof(struct timeval));
+                    calculate_timeout(timeout);
+                    ll_append_node(&cur_SWP->exp_time, timeout);
+                    ll_append_node(&cur_SWP->ACK_rec, 0);
                     char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
                     ll_append_node(outgoing_frames_head_ptr, outgoing_charbuf);
                     free(outgoing_frame);
@@ -123,9 +252,11 @@ void handle_input_cmds(Sender * sender,
                 else
                 {
                     if(cur_SWP->msg_buffer == NULL)
-                        strcpy(cur_SWP->msg_buffer, outgoing_cmd->message);
+                        strncpy(cur_SWP->msg_buffer, 
+                                outgoing_cmd->message+(i*FRAME_PAYLOAD_SIZE), FRAME_PAYLOAD_SIZE);
                     else
-                        strcat(cur_SWP->msg_buffer, outgoing_cmd->message);
+                        strncat(cur_SWP->msg_buffer, 
+                                outgoing_cmd->message+(i*FRAME_PAYLOAD_SIZE), FRAME_PAYLOAD_SIZE);
                 }
             }
         }
@@ -141,6 +272,15 @@ void handle_input_cmds(Sender * sender,
                 outgoing_frame->receiverID = outgoing_cmd->dst_id;
                 outgoing_frame->ACK = 0x0;
                 outgoing_frame->sequence = cur_SWP->LFS;
+//fprintf(stderr, "+++++++++++++++++++++++++\n");
+//fprintf(stderr, "cur_SWP cmd %p\n",cur_SWP);
+//fprintf(stderr, "Frame_buffer_head cmd %p\n",&cur_SWP->Frame_buffer_head);
+//fprintf(stderr, "Frame_buffer_head size %d\n",ll_get_length(cur_SWP->Frame_buffer_head));
+                ll_append_node(&cur_SWP->Frame_buffer_head, outgoing_frame);
+                struct timeval * timeout = (struct timeval *) malloc(sizeof(struct timeval));
+                calculate_timeout(timeout);
+                ll_append_node(&cur_SWP->ACK_rec, 0);
+                ll_append_node(&cur_SWP->exp_time, timeout);
             //At this point, we don't need the outgoing_cmd
   //              free(outgoing_cmd->message);
  //               free(outgoing_cmd);
@@ -150,7 +290,7 @@ void handle_input_cmds(Sender * sender,
 
                 ll_append_node(outgoing_frames_head_ptr,
                            outgoing_charbuf);
-                free(outgoing_frame);
+              //  free(outgoing_frame);
             }
             else
             {

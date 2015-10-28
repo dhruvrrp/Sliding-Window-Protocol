@@ -73,6 +73,7 @@ LLnode * ll_pop_node(LLnode ** head_ptr)
     if (last_node == prev_head)
     {
         (*head_ptr) = NULL;
+
         prev_head->next = NULL;
         prev_head->prev = NULL;
         return prev_head;
@@ -98,6 +99,20 @@ void ll_destroy_node(LLnode * node)
     free(node);
 }
 
+
+//Get function for LLnode. Returns null if n is larger than length
+LLnode * ll_get(uint16_t n, LLnode ** head_ptr)
+{
+    if(ll_get_length(*head_ptr) < n)
+        return NULL;
+    LLnode * cur = (*head_ptr);
+    int i = 0;
+    for(i = 0; i < n; i++)
+    {
+       cur = cur->next;
+    }
+    return cur;
+}
 //Compute the difference in usec for two timeval objects
 long timeval_usecdiff(struct timeval *start_time, 
                       struct timeval *finish_time)

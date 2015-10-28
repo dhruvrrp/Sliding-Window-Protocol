@@ -95,17 +95,23 @@ struct Sender_t
 
 struct Sender_sw
 {
-    uint16_t LAR;
-    uint16_t LFS;
+    unsigned char LAR;
+    unsigned char LFS;
     uint16_t receiver;
+    LLnode * Frame_buffer_head;
+    LLnode * exp_time;
+    LLnode * ACK_rec;
+
     char * msg_buffer;
 };
 typedef struct Sender_sw Sender_SWP;
 struct Receiver_sw
 {
-    uint16_t LFR;
-    uint16_t LAF;
+    unsigned char LFR;
+    unsigned char LAF;
     uint16_t sender;
+int str;
+    LLnode * Frame_buffer_head;
 };
 typedef struct Receiver_sw Receiver_SWP;
 enum SendFrame_DstType 
@@ -122,12 +128,12 @@ typedef struct Receiver_t Receiver;
 
 //TODO: You should change this!
 //Remember, your frame can be AT MOST 64 bytes!
-#define FRAME_PAYLOAD_SIZE 48
+#define FRAME_PAYLOAD_SIZE 58
 struct Frame_t
 {
     uint16_t senderID;
     uint16_t receiverID;
-    char sequence;
+    uint8_t sequence;
     char ACK;
     char data[FRAME_PAYLOAD_SIZE];
 };
