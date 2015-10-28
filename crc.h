@@ -1,5 +1,5 @@
-#ifndef __SENDER_H__
-#define __SENDER_H__
+#ifndef __CRC_H__
+#define __CRC_H__
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,9 +15,10 @@
 #include "common.h"
 #include "util.h"
 #include "communicate.h"
-#include "crc.h"
 
-void init_sender(Sender *, int);
-void * run_sender(void *);
+char get_bit(char byte, int pos);
+char crc8(char * array, int char_len);
+void append_crc(char * array, int array_len);
+int is_corrupted(char * array, int array_len);
 
 #endif

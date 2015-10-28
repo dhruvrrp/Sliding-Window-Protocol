@@ -15,6 +15,7 @@
 #include "common.h"
 #include "util.h"
 #include "communicate.h"
+#include "crc.h"
 
 void init_receiver(Receiver *, int);
 void * run_receiver(void *);

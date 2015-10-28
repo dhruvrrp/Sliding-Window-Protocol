@@ -12,7 +12,7 @@ OS = LINUX
 CCFLAGS = -Wall $(DEBUG) -D$(OS)
 
 # add object file names here
-OBJS = main.o util.o input.o communicate.o sender.o receiver.o
+OBJS = main.o util.o input.o communicate.o sender.o receiver.o crc.o
 
 all: tritontalk
 

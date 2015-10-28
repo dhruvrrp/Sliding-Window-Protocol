@@ -169,6 +169,7 @@ cur_SWP = get_SWP_instance(sender, inframe->senderID);
                     calculate_timeout(timeout);
                     ll_append_node(&cur_SWP->exp_time, timeout);
                     char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
+                    append_crc(outgoing_charbuf, strlen(outgoing_charbuf));
                     ll_append_node(outgoing_frames_head_ptr, outgoing_charbuf);
                     free(outgoing_frame);
                     free(temp);                             
@@ -245,6 +246,7 @@ void handle_input_cmds(Sender * sender,
                     ll_append_node(&cur_SWP->exp_time, timeout);
                     ll_append_node(&cur_SWP->ACK_rec, 0);
                     char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
+                    append_crc(outgoing_charbuf, strlen(outgoing_charbuf));
                     ll_append_node(outgoing_frames_head_ptr, outgoing_charbuf);
                     free(outgoing_frame);
                     free(temp);
@@ -287,7 +289,7 @@ void handle_input_cmds(Sender * sender,
 
             //Convert the message to the outgoing_charbuf
                 char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
-
+                append_crc(outgoing_charbuf, strlen(outgoing_charbuf));
                 ll_append_node(outgoing_frames_head_ptr,
                            outgoing_charbuf);
               //  free(outgoing_frame);
@@ -309,6 +311,7 @@ void handle_input_cmds(Sender * sender,
 void handle_timedout_frames(Sender * sender,
                             LLnode ** outgoing_frames_head_ptr)
 {
+ 
     //TODO: Suggested steps for handling timed out datagrams
     //    1) Iterate through the sliding window protocol information you maintain for each receiver
     //    2) Locate frames that are timed out and add them to the outgoing frames

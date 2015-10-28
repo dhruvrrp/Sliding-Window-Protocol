@@ -85,20 +85,22 @@ void handle_incoming_msgs(Receiver * receiver,
         //Pop a node off the front of the link list and update the count
         LLnode * ll_inmsg_node = ll_pop_node(&receiver->input_framelist_head);
         incoming_msgs_length = ll_get_length(receiver->input_framelist_head);
-
+        int cor = 0;
         //DUMMY CODE: Print the raw_char_buf
         //NOTE: You should not blindly print messages!
         //      Ask yourself: Is this message really for me?
         //                    Is this message corrupted?
         //                    Is this an old, retransmitted message?           
         char * raw_char_buf = (char *) ll_inmsg_node->value;
+        if(is_corrupted(raw_char_buf, strlen(raw_char_buf)))
+            cor = 1; 
         Frame * inframe = convert_char_to_frame(raw_char_buf);
         Receiver_SWP * cur_SWP;
         cur_SWP = get_SWP_instanceR(receiver, inframe->senderID);
         //Free raw_char_buf
         free(raw_char_buf);
         //Check if data belongs to this receiver and send ACK
-        if(inframe->receiverID == receiver->recv_id) 
+        if(inframe->receiverID == receiver->recv_id && cor == 0) 
         {
  //ADD CASE FOR DUPLICATES
             if((inframe->sequence >= cur_SWP->LFR && inframe->sequence < cur_SWP->LAF)||cur_SWP->str == 0)
